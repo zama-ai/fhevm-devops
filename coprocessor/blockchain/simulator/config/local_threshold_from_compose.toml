@@ -1,4 +1,4 @@
-s3_endpoint = "http://dev-s3-mock:9000/kms"
+s3_endpoint = "http://s3-mock:9000/kms"
 object_folder = ["PUB-p1","PUB-p2","PUB-p3","PUB-p4"]
 
 validator_addresses = ["http://kms-blockchain-validator:9090"]

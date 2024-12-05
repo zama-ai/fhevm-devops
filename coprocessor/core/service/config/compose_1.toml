@@ -26,7 +26,7 @@ num_sessions_preproc = 2
 # different parties.
 public_storage_url = "s3://kms"
 private_storage_url = "file://./keys"
-aws_s3_proxy = "http://dev-s3-mock:9000"
+aws_s3_proxy = "http://s3-mock:9000"
 aws_region = "us-east-1"
 
 # The below is optional and used for TLS certificates

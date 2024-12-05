@@ -25,14 +25,14 @@ services:
       - minio_secrets:/minio_secrets
       - ../core/service/config/:/app/kms/core/service/config
     depends_on:
-      dev-s3-mock-setup:
+      s3-mock-setup:
         condition: service_completed_successfully
     entrypoint: >
       /bin/sh -c "
       export AWS_ACCESS_KEY_ID=$$(cat /minio_secrets/access_key) &&
       export AWS_SECRET_ACCESS_KEY=$$(cat /minio_secrets/secret_key) &&
       echo 'Generating signing keys' &&
-      kms-gen-keys centralized --pub-url s3://kms --aws-s3-endpoint http://dev-s3-mock:9000 --aws-region us-east-1 --priv-url file://./keys --cmd signing-keys &&
+      kms-gen-keys centralized --pub-url s3://kms --aws-s3-endpoint http://s3-mock:9000 --aws-region us-east-1 --priv-url file://./keys --cmd signing-keys &&
       echo 'Starting kms service' &&
       kms-server centralized --config-file config/compose_centralized.toml
       "
