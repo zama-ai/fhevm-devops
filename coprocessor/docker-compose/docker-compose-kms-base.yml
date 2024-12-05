@@ -1,5 +1,3 @@
-name: zama-kms-base
-
 # A docker compose file to be able to debug the kms
 # The images take a bit of time to build
 
@@ -8,7 +6,6 @@ name: zama-kms-base
 # TODO: create a overload version of this docker compose to use only ghcr main images
 # TODO: create a overload version of this docker compose to use only ghcr released images
 # TODO: add a faucet
-# TODO: add minio to simulate s3 + some config file for the endpoint
 
 services:
   # KMS Blockchain
