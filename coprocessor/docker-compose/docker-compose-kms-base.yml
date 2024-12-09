@@ -9,7 +9,7 @@
 
 services:
   # KMS Blockchain
-  dev-kms-blockchain-validator:
+  kms-blockchain-validator:
     image: ghcr.io/zama-ai/kms-blockchain-asc:${DOCKER_IMAGES_TAG}
     healthcheck:
       test: "wget -Sq --spider http://localhost:26657/status"
@@ -24,24 +24,24 @@ services:
       - "9090:9090"
     volumes:
       - ../blockchain/scripts:/app/scripts
-      - validator_secrets:/app/secrets
+      - kms_blockchain_validator_secrets:/app/secrets
     entrypoint: [ "/app/scripts/bootstrap_validator.sh" ]
 
   # Smart contract deployment
-  dev-kms-blockchain-asc-deploy:
+  setup-kms-blockchain-contracts:
     image: ghcr.io/zama-ai/kms-blockchain-asc:${DOCKER_IMAGES_TAG}
     restart: "no"
     depends_on:
-      dev-kms-blockchain-validator:
+      kms-blockchain-validator:
         condition: service_healthy
     environment:
-      VALIDATOR_NODE_ENDPOINT: http://dev-kms-blockchain-validator:26657
+      VALIDATOR_NODE_ENDPOINT: http://kms-blockchain-validator:26657
     build:
       context: .
       dockerfile: blockchain/contracts/operations/docker/ci.dockerfile
     volumes:
       - ../blockchain/scripts:/app/scripts
-      - validator_secrets:/app/secrets
+      - kms_blockchain_validator_secrets:/app/secrets
     entrypoint: >
       /bin/sh -c " chmod +x /app/scripts/setup_wallets.sh && chmod +x /app/scripts/deploy_contracts.sh && /app/scripts/setup_wallets.sh && sleep 10 && /app/scripts/deploy_contracts.sh && touch /tmp/done && sleep 65 && exit 0 "
     healthcheck:
@@ -52,7 +52,7 @@ services:
       start_period: 60s
 
   # KV-Store
-  dev-kv-store:
+  kms-kv-store:
     image: ghcr.io/zama-ai/kms-blockchain-gateway:${DOCKER_IMAGES_TAG}
     build:
       context: .
@@ -104,7 +104,7 @@ services:
 
 volumes:
   minio_secrets:
-  validator_secrets:
+  kms_blockchain_validator_secrets:
 
 
 secrets:
