@@ -1,14 +1,13 @@
 #!/usr/bin/make -f
 
+# Load environment variables to makefile and export it to shell environment
 include .env
-
+export $(shell cat .env | sed 's/=.*//g')
 
 BINDIR ?= $(GOPATH)/bin
 ETHERMINT_BINARY = ethermintd
 ETHERMINT_DIR = ethermint
 BUILDDIR ?= $(CURDIR)/build
-
-
 
 WORKDIR ?= $(CURDIR)/work_dir
 SUDO := $(shell which sudo)
@@ -34,7 +33,6 @@ check_os:
 # This version must the same as in docker-compose-full.yml
 # TODO add check
 KMS_DEV_VERSION ?= $(DOCKER_IMAGES_TAG)
-
 FHEVM_SOLIDITY_REPO ?= fhevm
 FHEVM_SOLIDITY_PATH ?= $(WORKDIR)/$(FHEVM_SOLIDITY_REPO)
 FHEVM_SOLIDITY_PATH_EXISTS := $(shell test -d $(FHEVM_SOLIDITY_PATH)/.git && echo "true" || echo "false")
@@ -85,7 +83,7 @@ endif
 
 init-db: check-all-test-repo  
 ifeq ($(CENTRALIZED_KMS),false)
-	@echo "CENTRALIZED_KMS is false, we are extracting keys from kms-core-1"
+	@echo "CENTRALIZED_KMS is false, we are extracting keys from kms-core"
 	$(MAKE) copy-keys-threshold-key-gen
 else ifeq ($(CENTRALIZED_KMS),true)
 	@echo "CENTRALIZED_KMS is true, copying fhe keys from dev image"
@@ -93,8 +91,8 @@ else ifeq ($(CENTRALIZED_KMS),true)
 else
 	@echo "CENTRALIZED_KMS is set to an unrecognized value: $(CENTRALIZED_KMS)"
 endif
-	@COMPOSE_PROJECT_NAME=zama-kms-gateway docker compose -vvv -f docker-compose/docker-compose-db-migration.yml up -d --wait || true
-	@if [ "$$(docker inspect -f '{{.State.ExitCode}}' migration)" -eq 0 ]; then \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv -f docker-compose/docker-compose-setup-fhevm-coprocessor-db.yml up -d --wait || true
+	@if [ "$$(docker inspect -f '{{.State.ExitCode}}' $(DOCKER_COMPOSE_PROJECT)-setup-fhevm-coprocessor-db)" -eq 0 ]; then \
 		echo "Container exited with code 0, proceeding..."; \
 	else \
 		echo "Container did not exit successfully, failing..."; \
@@ -102,9 +100,9 @@ endif
 	fi
 
 
-deploy-fhevm: 
-	@COMPOSE_PROJECT_NAME=zama-kms-gateway docker compose -vvv -f docker-compose/docker-compose-fhevm-deploy.yml up -d --wait || true
-	@if [ "$$(docker inspect -f '{{.State.ExitCode}}' fhevm-deploy)" -eq 0 ]; then \
+setup-fhevm-contracts:
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv -f docker-compose/docker-compose-setup-fhevm-contracts.yml up -d --wait || true
+	@if [ "$$(docker inspect -f '{{.State.ExitCode}}' zama-setup-fhevm-contracts)" -eq 0 ]; then \
 		echo "Container exited with code 0, proceeding..."; \
 	else \
 		echo "Container did not exit successfully, failing..."; \
@@ -113,21 +111,6 @@ deploy-fhevm:
 
 check-all-test-repo: check-fhevm-solidity
 
-
-generate-fhe-keys-registry-dev-image:
-ifeq ($(KEY_GEN),false)
-	@echo "KEY_GEN is false, executing corresponding commands..."
-	@bash ./scripts/copy_fhe_keys.sh $(KMS_DEV_VERSION) $(PWD)/network-fhe-keys $(PWD)/kms-fhe-keys
-else ifeq ($(KEY_GEN),true)
-	@echo "KEY_GEN is true, executing corresponding commands..."
-	@bash ./scripts/prepare_volumes_from_kms_core.sh $(KMS_DEV_VERSION) $(PWD)/network-fhe-keys $(PWD)/kms-fhe-keys
-else
-	@echo "KEY_GEN is set to an unrecognized value: $(KEY_GEN)"
-endif
-
-copy-keys-threshold:
-	@bash ./scripts/copy_fhe_keys_threshold.sh zama-kms-threshold-dev-kms-core-1-1 $(PWD)/network-fhe-keys
-	@bash ./scripts/update_signers.sh $(PWD)/work_dir/fhevm/.env.example.deployment $(PWD)/network-fhe-keys
 
 copy-keys-threshold-key-gen:
 	@bash ./scripts/copy_fhe_keys_threshold_key_gen.sh $(PWD)/network-fhe-keys
@@ -149,59 +132,59 @@ trigger-crs-gen-threshold:
 		insecure-crs-gen --max-num-bits 256
 
 run-kms-threshold:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-threshold.yml \
 		up -d --wait
 
 run-kms-threshold-with-gateway:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-threshold.yml \
 		-f docker-compose/docker-compose-kms-gateway-threshold.yml \
-		-f docker-compose/docker-compose-coprocesor.yml \
+		-f docker-compose/docker-compose-fhevm-coprocessor.yml \
 		up -d --wait
 
 stop-kms-threshold:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-threshold.yml \
 		down --volumes --remove-orphans
 
 run-kms-centralized:
-	docker compose -vvv \
+	docker -p $(DOCKER_COMPOSE_PROJECT) compose -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-centralized.yml \
 		up -d --wait
 
 stop-kms-centralized:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-centralized.yml \
 		down
 
 run-kms-centralized-with-gateway:
-	docker compose -vvv \
+	docker compose  -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-centralized.yml \
 		-f docker-compose/docker-compose-kms-gateway-centralized.yml \
-		-f docker-compose/docker-compose-coprocesor.yml \
+		-f docker-compose/docker-compose-fhevm-coprocessor.yml \
 		up -d --wait
 
 stop-kms-centralized-with-gateway:
-	docker compose -vvv \
+	docker compose  -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-centralized.yml \
 		-f docker-compose/docker-compose-kms-gateway-centralized.yml \
-		-f docker-compose/docker-compose-coprocesor.yml \
+		-f docker-compose/docker-compose-fhevm-coprocessor.yml \
 		down -v --remove-orphans
 
 stop-kms-threshold-with-gateway:
-	docker compose -vvv \
+	docker compose  -p $(DOCKER_COMPOSE_PROJECT) -vvv \
 		-f docker-compose/docker-compose-kms-base.yml \
 		-f docker-compose/docker-compose-kms-threshold.yml \
 		-f docker-compose/docker-compose-kms-gateway-threshold.yml \
-		-f docker-compose/docker-compose-coprocesor.yml \
+		-f docker-compose/docker-compose-fhevm-coprocessor.yml \
 		down -v --remove-orphans
 
 
@@ -249,8 +232,8 @@ install-packages:
 
 
 prepare-e2e-test: check-all-test-repo
-	@bash scripts/fund_tests_addresses_docker_coprocessor.sh
-	$(MAKE) deploy-fhevm
+	@bash scripts/fund_tests_addresses_docker.sh
+	$(MAKE) setup-fhevm-contracts
 	@cp ./scripts/hardhat-compile.sh $(FHEVM_SOLIDITY_PATH)
 	@cp ./env/.env.example.deployment $(FHEVM_SOLIDITY_PATH)/.env
 	@cd $(FHEVM_SOLIDITY_PATH) &&  ./hardhat-compile.sh
@@ -320,28 +303,28 @@ run-gw:
 	@docker compose -vvv -f docker-compose/docker-compose-kms-base.yml -f docker-compose/docker-compose-kms-centralized.yml -f docker-compose/docker-compose-kms-gateway-centralized.yml up dev-kms-gateway
 
 restart-kv:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
     -f docker-compose/docker-compose-kms-base.yml \
     -f docker-compose/docker-compose-kms-threshold.yml \
     -f docker-compose/docker-compose-kms-gateway-threshold.yml \
-    -f docker-compose/docker-compose-coprocesor.yml \
+    -f docker-compose/docker-compose-fhevm-coprocessor.yml \
     up -d --no-deps dev-kv-store
 
 
 restart-coproc:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
     -f docker-compose/docker-compose-kms-base.yml \
     -f docker-compose/docker-compose-kms-threshold.yml \
     -f docker-compose/docker-compose-kms-gateway-threshold.yml \
-    -f docker-compose/docker-compose-coprocesor.yml \
+    -f docker-compose/docker-compose-fhevm-coprocessor.yml \
     up -d --no-deps coproc
 
 
 restart-gw:
-	docker compose -vvv \
+	docker compose -p $(DOCKER_COMPOSE_PROJECT) -vvv \
     -f docker-compose/docker-compose-kms-base.yml \
     -f docker-compose/docker-compose-kms-threshold.yml \
     -f docker-compose/docker-compose-kms-gateway-threshold.yml \
-    -f docker-compose/docker-compose-coprocesor.yml \
+    -f docker-compose/docker-compose-fhevm-coprocessor.yml \
     up -d --no-deps dev-kms-gateway
 
