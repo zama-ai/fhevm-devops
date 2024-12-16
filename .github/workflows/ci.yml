@@ -1,0 +1,38 @@
+name: End-to-end demo with key generation
+
+on:
+  pull_request:
+    branches: [ main ]
+
+jobs:
+  test-with-keygen:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run make command
+      run: 
+        echo "KEY_GEN=true" > .env
+
+        make e2e-test
+
+  test-without-keygen:
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Set up Docker Buildx
+      uses: docker/setup-buildx-action@v3
+
+    - name: Run make command
+      run: 
+        echo "KEY_GEN=false" > .env
+
+        make e2e-test
